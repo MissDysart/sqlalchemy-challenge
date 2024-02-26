@@ -64,6 +64,24 @@ def precipitation():
     return jsonify(past_year_prcp)
 
 
+@app.route("/api/v1.0/stations")
+def stations():
+    # Return a list of stations
+    all_stations = session.query(Station).all()
+
+    return jsonify(all_stations)
+
+
+@app.route("/api/v1.0/tobs")
+def observations():
+    year_ago = dt.date(2017, 8, 23) - dt.timedelta(days=365)
+    year_tobs = session.query(Measurement.tobs).\
+    filter(Measurement.station == 'USC00519281').filter(Measurement.date >= year_ago).all()
+
+    return jsonify(year_tobs)
+
+
+session.close()
 
 if __name__ == '__main__':
     app.run(debug=True)
