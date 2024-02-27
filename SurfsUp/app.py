@@ -4,6 +4,7 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
 import datetime as dt
+import numpy as np
 
 from flask import Flask, jsonify
 
@@ -49,36 +50,59 @@ def homepage():
 
 @app.route("/api/v1.0/precipitation")
 def precipitation():
-    # Get query results of precipitation analysis
+    """Return the results of the precipitation analysis for the last 12 months"""
     year_ago = dt.date(2017, 8, 23) - dt.timedelta(days=365)
-    year_prcp = session.query(Measurement.date, Measurement.prcp).filter(Measurement.date >= year_ago).all()
+    year_prcp = session.query(Measurement.date, Measurement.prcp).\
+        filter(Measurement.date >= year_ago).order_by(Measurement.date.desc()).all()
     # session.close()
     # Convert to dictionary
     past_year_prcp = []
-    for date,prcp in year_prcp:
+    for date, prcp in year_prcp:
         prcp_dict = {}
-        prcp_dict["date"] = date
-        prcp_dict["prcp"] = prcp
+        prcp_dict[date] = prcp
         past_year_prcp.append(prcp_dict)
-
+    # and JSON-ify!
     return jsonify(past_year_prcp)
 
 
 @app.route("/api/v1.0/stations")
 def stations():
-    # Return a list of stations
-    all_stations = session.query(Station).all()
+    """Return a list of stations"""
+    stations = session.query(Station.station).all()
+    station_list = list(np.ravel(stations))
+    # stations = session.query(Station.station, Station.name,
+    #        Station.longitude, Station.latitude,
+    #        Station.elevation).order_by(Station.station).all()
+    # station_list = []
+    # for station, name, longitude, latitude, elevation in stations:
+    #     station_dict = {}
+    #     station_dict["Station"] = station
+    #     station_dict["Name"] = name
+    #     station_dict["Longitude"] = longitude
+    #     station_dict["Latitude"] = latitude
+    #     station_dict["Elevation"] = elevation
+    #     station_list.append(station_dict)
 
-    return jsonify(all_stations)
+    return jsonify(station_list)
 
 
 @app.route("/api/v1.0/tobs")
 def observations():
+    """Return the dates and temperature observations of the most-active station for the last 12 months"""
     year_ago = dt.date(2017, 8, 23) - dt.timedelta(days=365)
-    year_tobs = session.query(Measurement.tobs).\
-    filter(Measurement.station == 'USC00519281').filter(Measurement.date >= year_ago).all()
+    year_tobs = session.query(Measurement.date, Measurement.tobs).\
+    filter(Measurement.station == 'USC00519281').filter(Measurement.date >= year_ago).\
+        order_by(Measurement.date.desc()).all()
 
-    return jsonify(year_tobs)
+    # Convert to dictionary
+    past_year_temp = []
+    for date, temp in year_tobs:
+        tobs_dict = {}
+        tobs_dict["Date"] = date
+        tobs_dict["Temperature"] = temp
+        past_year_temp.append(tobs_dict)
+    # and JSON-ify!
+    return jsonify(past_year_temp)
 
 
 session.close()
