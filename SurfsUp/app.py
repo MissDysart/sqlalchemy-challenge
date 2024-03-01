@@ -29,10 +29,13 @@ session = Session(engine)
 # Calculate the year prior to given date of 2017-08-23
 year_ago = dt.date(2017, 8, 23) - dt.timedelta(days=365)
 
-# List of agregates to select in queries for Dynamic Routes
+# List of aggregates to select in queries for dynamic routes
 sel = [func.min(Measurement.tobs),
        func.avg(Measurement.tobs),
        func.max(Measurement.tobs)]
+
+# Date format for dynamic route queries
+date_format = func.strftime("%Y-%m-%d", Measurement.date)
 
 #################################################
 # Flask Setup
@@ -62,7 +65,7 @@ def homepage():
 @app.route("/api/v1.0/precipitation")
 def precipitation():
     """Return the results of the precipitation analysis for the last 12 months"""
-    # year_ago = dt.date(2017, 8, 23) - dt.timedelta(days=365)
+    
     year_prcp = session.query(Measurement.date, Measurement.prcp).\
         filter(Measurement.date >= year_ago).order_by(Measurement.date.desc()).all()
     
@@ -80,6 +83,7 @@ def precipitation():
 @app.route("/api/v1.0/stations")
 def stations():
     """Return a list of stations"""
+
     stations = session.query(Station.station).all()
     station_list = list(np.ravel(stations))
     
@@ -90,7 +94,7 @@ def stations():
 @app.route("/api/v1.0/tobs")
 def observations():
     """Return the dates and temperature observations of the most-active station for the last 12 months"""
-    # year_ago = dt.date(2017, 8, 23) - dt.timedelta(days=365)
+    
     year_tobs = session.query(Measurement.date, Measurement.tobs).\
     filter(Measurement.station == 'USC00519281').filter(Measurement.date >= year_ago).\
         order_by(Measurement.date.desc()).all()
@@ -107,36 +111,41 @@ def observations():
     return jsonify(past_year_temp)
 
 
+# Dynamic Routes
 
-@app.route("/api/v1.0/start")
-def temps_user_start_to_last():
+@app.route("/api/v1.0/<start>")
+def temps_user_start_to_last(start):
     """Return the minimum temperature, the average temperature,
     and the maximum temperature (>= start date) for a user-specified start date"""
-    start_date = "2016-08-23"
-    #start_date = dt.datetime.strftime(input(), "%Y-%m-%d")
-    # sel = [func.min(Measurement.tobs),
-    #        func.avg(Measurement.tobs),
-    #        func.max(Measurement.tobs)]
-    # temp_aggs = session.query(*sel).filter(Measurement.date >= start_date).all()
-    # temp_info = list(np.ravel(temp_aggs))
-    start_to_last_temp_aggs = list(np.ravel(session.query(*sel).filter(Measurement.date >= start_date).all()))
-    #return jsonify(f"Min Temp: {temp_info[0]}, Average Temp: {temp_info[1]}, Max Temp: {temp_info[2]}")
-    
-    return jsonify(start_to_last_temp_aggs)
 
-@app.route("/api/v1.0/start/end")
-def temps_user_start_to_user_end():
+    # Accept user input
+    start_date = start.replace(" ", "")
+    # Run query with user input
+    if start_date >= "2010-01-01" and start_date < "2017-08-23":
+        start_to_last_temp_aggs = list(np.ravel(session.query(*sel).\
+                                        filter(date_format >= start_date).all()))
+        # and JSON-ify!
+        return jsonify(start_to_last_temp_aggs)
+    # Print an error if the dates do not follow parameters
+    return jsonify({"error": "Dates must follow the format of yyyy-mm-dd and fall bewteen 2010-01-01 and 2017-08-22."}), 404
+
+@app.route("/api/v1.0/<start>/<end>")
+def temps_user_start_to_user_end(start, end):
     """Return the minimum temperature, the average temperature,
     and the maximum temperature for user-specified start-end range"""
-
-    end_date = "2016-08-23"
-    start_date = "2016-01-31"
-
-    start_to_end_temp_aggs = list(np.ravel(session.query(*sel).\
-                                        filter(Measurement.date >= start_date).\
-                                        filter(Measurement.date <= end_date).all()))
-
-    return jsonify(start_to_end_temp_aggs)
+    # Accept user input
+    start_date = start.replace(" ", "")
+    end_date = end.replace(" ", "")
+    # Run query with user input
+    if start_date >= "2010-01-01" and end_date <= "2017-08-23":
+        start_to_end_temp_aggs = list(np.ravel(session.query(*sel).\
+                                        filter(date_format >= start_date).\
+                                        filter(date_format <= end_date).all()))
+        # and JSON-ify!
+        return jsonify(start_to_end_temp_aggs)
+    # Print an error if the dates do not follow parameters
+    return jsonify({"error": "Dates must follow the format of yyyy-mm-dd and fall bewteen 2010-01-01 and 2017-08-23."}), 404
+    
 
 # Close the session
 session.close()
